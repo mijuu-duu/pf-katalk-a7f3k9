@@ -7,7 +7,15 @@ const VER = (function(){
   try { return new URL(self.location.href).searchParams.get('v') || 'dev'; }
   catch(e){ return 'dev'; }
 })();
-const CACHE = 'crimescene-' + VER;
+const PREFIX = 'crimescene-kakao-';
+const CACHE = PREFIX + VER;
+/* 같은 주소(github.io 등)에 다른 단서 앱이 함께 올라가 있을 수 있으므로
+   이 앱의 캐시만 골라낸다. 예전 이름(crimescene-<버전>)도 이 앱 것으로 본다. */
+function isMine(k){
+  if (k.indexOf(PREFIX) === 0) return true;
+  if (k.indexOf('crimescene-') !== 0) return false;
+  return k.indexOf('crimescene-insta-') !== 0;
+}
 const ASSETS = [
   './',
   './index.html',
@@ -28,7 +36,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await Promise.all(keys.filter(k => isMine(k) && k !== CACHE).map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });

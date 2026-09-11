@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko"><head>
 <meta charset="UTF-8">
-<!-- This site is hosted on Netlify. Anyone can build and deploy a site
-     like this one for free: https://netlify.new/?utm_campaign=ai-legible&utm_source=comment&utm_medium=referral&utm_id=babc537e-f7d0-46b1-a6a9-e9dee9273d42
-     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
-<meta name="hosting-provider" content="Netlify">
-<meta name="netlify-deploy" content="https://netlify.new/?utm_campaign=ai-legible&amp;utm_source=meta&amp;utm_medium=referral&amp;utm_id=babc537e-f7d0-46b1-a6a9-e9dee9273d42">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2799,7 +2794,7 @@ const EMBEDDED_DATA = {
 
 /* 코드(기능) 버전. 데이터와 별개로 “이 파일의 프로그램이 언제 것인지”를 나타낸다.
    관리자 정보란에 표시되므로, 폰에 옛 파일이 올라갔는지 바로 알 수 있다. */
-const CODE_VERSION = '2026-09-11-M';
+const CODE_VERSION = '2026-09-11-O';
 
 const STORE_KEY = 'crimescene_kakao_v2';
 const LEGACY_KEYS = ['crimescene_kakao_v1'];
@@ -2840,6 +2835,16 @@ function goBack(){
   closeTop();
 }
 
+/* 같은 주소(github.io 등)에 다른 단서 앱이 함께 올라가 있을 수 있다.
+   캐시·서비스워커를 지울 때 이 앱 것만 골라내기 위한 판별기. */
+function isMyCache(k){
+  if(k.indexOf('crimescene-kakao-') === 0) return true;      /* 지금 이름 */
+  if(k.indexOf('crimescene-') !== 0) return false;
+  return k.indexOf('crimescene-insta-') !== 0;               /* 예전 이름(단, 인스타 것은 제외) */
+}
+function appDir(){ try{ return new URL('./', location.href).href; }catch(e){ return location.href; } }
+function isMySW(reg){ return String(reg && reg.scope).indexOf(appDir()) === 0; }
+
 function wipeStored(){
   try{
     localStorage.removeItem(STORE_KEY);
@@ -2847,7 +2852,7 @@ function wipeStored(){
   }catch(e){}
   try{
     if(window.caches && caches.keys){
-      caches.keys().then(keys=>keys.forEach(k=>{ if(k.indexOf(DATA_VERSION)===-1) caches.delete(k); }));
+      caches.keys().then(keys=>keys.forEach(k=>{ if(isMyCache(k) && k.indexOf(DATA_VERSION)===-1) caches.delete(k); }));
     }
   }catch(e){}
 }
@@ -2927,12 +2932,12 @@ function forceUpdate(){
   try{ localStorage.removeItem(STORE_KEY); LEGACY_KEYS.forEach(k=>localStorage.removeItem(k)); }catch(e){}
   try{
     if(window.caches && caches.keys){
-      steps.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));
+      steps.push(caches.keys().then(ks=>Promise.all(ks.filter(isMyCache).map(k=>caches.delete(k)))));
     }
   }catch(e){}
   try{
     if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
-      steps.push(navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))));
+      steps.push(navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.filter(isMySW).map(r=>r.unregister()))));
     }
   }catch(e){}
   Promise.all(steps).then(go, go);
@@ -3028,6 +3033,7 @@ function normalize(d){
   const keep = data;
   data = d;                 /* ensureTree 안에서 쓰는 도우미들이 data 를 참조한다 */
   try{ ensureTree(d); } catch(e){}
+  try{ ensureAdDefault(d); } catch(e){}
   data = keep;
   return d;
 }
@@ -3082,6 +3088,31 @@ function countInCat1(c1){
   (c1.children||[]).forEach(c2=> lists += (c2.lists||[]).length);
   return { subs:(c1.children||[]).length, lists:lists };
 }
+/* ---------- 공통 광고 배너 ----------
+   모든 목록이 같은 광고를 쓰고, 새로 만드는 목록에도 자동으로 들어간다.
+   기준은 data.adDefault 이며 없으면 “박씨네”(없으면 첫 목록)의 광고에서 가져온다. */
+function adTemplate(d){
+  const src = d || data;
+  return Object.assign({ show:true, top:'', head:'', foot:'광고입니다.', img:'', logo:'' }, src.adDefault || {});
+}
+function ensureAdDefault(d){
+  if(d.adDefault) return;
+  let ref = (d.lists||[]).find(L=>String(L.label||'').indexOf('박씨네') >= 0)
+         || (d.lists||[]).find(L=>L.ad && L.ad.show && (L.ad.head||L.ad.top))
+         || (d.lists||[])[0];
+  d.adDefault = Object.assign({ show:true, top:'', head:'', foot:'광고입니다.', img:'', logo:'' }, (ref && ref.ad) || {});
+  /* 처음 도입할 때 모든 목록에 같은 광고를 넣어준다 */
+  (d.lists||[]).forEach(L=>{ L.ad = JSON.parse(JSON.stringify(d.adDefault)); });
+}
+/* 지금 목록의 광고를 모든 목록에 적용하고, 새 목록의 기본값으로도 저장 */
+function applyAdToAll(){
+  const src = curList().ad || {};
+  data.adDefault = JSON.parse(JSON.stringify(src));
+  data.lists.forEach(L=>{ L.ad = JSON.parse(JSON.stringify(src)); });
+  save(); renderChrome(); renderAdminHome();
+  toast('광고 배너를 모든 목록(' + data.lists.length + '개)에 적용했습니다');
+}
+
 /* 트리 정리 + 옛 데이터 올려주기 */
 function ensureTree(d){
   if(!Array.isArray(d.tree)) d.tree = [];
@@ -4003,7 +4034,7 @@ function bindTreeSection(body){
       const label = uniqueName(data.lists.map(listLabel), '새 목록');
       const key = makeListKey(c1.name, c2.name, label, null);
       data.lists.push({ key:key, label:label, title:'채팅', chipText:'ChatGPT', bottomPad:0,
-        ad:{ show:false, top:'', head:'', foot:'광고입니다.', img:'', logo:'' }, rooms:[] });
+        ad:adTemplate(), rooms:[] });   /* 공통 광고 배너를 그대로 물려준다 */
       c2.lists.push(key);
       listIdx = data.lists.length - 1;
     }
@@ -4248,6 +4279,9 @@ function renderAdminHome(resetScroll){
         <input type="file" id="ed-adImgFile" accept="image/*" style="display:none">
       </div>
       <button class="btn btn-ghost btn-sm" id="saveChrome">꾸미기 저장</button>
+      <button class="btn btn-primary btn-block" id="adToAll" style="margin-top:8px">이 광고를 모든 목록에 적용</button>
+      <div class="hint" style="margin-top:4px">지금 목록의 광고 배너를 <b>${data.lists.length}개 목록 전체</b>에 복사하고,
+        앞으로 새로 만드는 목록에도 자동으로 들어가게 합니다.</div>
       </div>
     </div>
 
@@ -4352,13 +4386,15 @@ function renderAdminHome(resetScroll){
   bindTreeSection(body);
 
   $('#saveListTitle').onclick = ()=>{ curList().title = $('#ed-listTitle').value; save(); toast('저장됨'); renderAdminHome(); };
+  $('#adToAll').onclick = applyAdToAll;
   $('#saveChrome').onclick = ()=>{
     const C = curList();
     C.chipText = $('#ed-chipText').value;
     C.ad = C.ad || {};
     C.ad.show = $('#ed-adShow').checked;
     C.ad.top = $('#ed-adTop').value; C.ad.head = $('#ed-adHead').value; C.ad.foot = $('#ed-adFoot').value;
-    save(); toast('저장됨'); renderChrome();
+    data.adDefault = JSON.parse(JSON.stringify(C.ad));   /* 새로 만드는 목록의 기본 광고로도 저장 */
+    save(); toast('저장됨 · 새 목록에도 이 광고가 들어갑니다'); renderChrome();
   };
   $('#ed-adImg').onclick = ()=> $('#ed-adImgFile').click();
   $('#ed-adImgFile').onchange = e=>{
@@ -4768,16 +4804,27 @@ function selfHtml(){
   const ml = root.querySelector('#manifestLink'); if(ml) ml.setAttribute('href','./manifest.webmanifest');
   return '<!DOCTYPE html>\n' + root.outerHTML + '\n';
 }
+/* 호스팅 업체가 자동으로 끼워넣는 홍보·통계 코드를 걸러낸다.
+   주석을 지울 때 주석 경계(-->)를 넘지 않도록 제한해, 파일 본문을 건드리지 않게 한다. */
+function stripHostInjected(html){
+  let out = html;
+  out = out.replace(/<!--(?:(?!-->)[\s\S]){0,1000}?netlify\.new(?:(?!-->)[\s\S]){0,1000}?-->\s*/gi, '');
+  out = out.replace(/<meta\s+name="hosting-provider"[^>]*>\s*/gi, '');
+  out = out.replace(/<meta\s+name="netlify-deploy"[^>]*>\s*/gi, '');
+  out = out.replace(/<script\b[^>]*src="\/\.netlify\/[^>]*>\s*<\/script>\s*/gi, '');
+  return out;
+}
 /* 지금 내용을 담은 새 index.html 을 만든다 (데이터 구간만 교체) */
 function buildHtmlFrom(tpl){
-  const i = tpl.indexOf(MARK_S), j = tpl.indexOf(MARK_E);
+  const src = stripHostInjected(tpl);
+  const i = src.indexOf(MARK_S), j = src.indexOf(MARK_E);
   if(i < 0 || j <= i) return null;
   const ver = newVersion();
   const json = JSON.stringify(data, null, 1).replace(/<\//g, '<\\/');
   const block = MARK_S + ' 아래 두 줄이 이 파일에 들어있는 대화 내용입니다. */\n'
     + 'const DATA_VERSION = ' + JSON.stringify(ver) + ';\n'
     + 'const EMBEDDED_DATA = ' + json + ';\n';
-  return { html: tpl.slice(0,i) + block + tpl.slice(j), version: ver };
+  return { html: src.slice(0,i) + block + src.slice(j), version: ver };
 }
 function finishExportHtml(built){
   if(!built){ toast('파일을 만들 수 없습니다'); return; }
@@ -4900,10 +4947,10 @@ listTitleEl.addEventListener('touchstart', startPress, {passive:true});
 /* 주소 끝에 ?reset=1 을 붙여 열면 폰에 저장된 내용과 캐시를 전부 지우고 파일 내용으로 시작한다 */
 if(/[?&]reset=1/.test(location.search)){
   try{ localStorage.removeItem(STORE_KEY); localStorage.removeItem(LAST_KEY); LEGACY_KEYS.forEach(k=>localStorage.removeItem(k)); }catch(e){}
-  try{ if(window.caches && caches.keys) caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))); }catch(e){}
+  try{ if(window.caches && caches.keys) caches.keys().then(ks=>ks.forEach(k=>{ if(isMyCache(k)) caches.delete(k); })); }catch(e){}
   try{
     if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
-      navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister()));
+      navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>{ if(isMySW(r)) r.unregister(); }));
     }
   }catch(e){}
 }
@@ -4950,4 +4997,3 @@ setTimeout(()=> checkForUpdate(false), 1500);
 
 
 </body></html>
-<script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" data-netlify-site-id="babc537e-f7d0-46b1-a6a9-e9dee9273d42" data-app-host="app.netlify.com"></script>
