@@ -2799,7 +2799,7 @@ const EMBEDDED_DATA = {
 
 /* 코드(기능) 버전. 데이터와 별개로 “이 파일의 프로그램이 언제 것인지”를 나타낸다.
    관리자 정보란에 표시되므로, 폰에 옛 파일이 올라갔는지 바로 알 수 있다. */
-const CODE_VERSION = '2026-09-11-L';
+const CODE_VERSION = '2026-09-11-M';
 
 const STORE_KEY = 'crimescene_kakao_v2';
 const LEGACY_KEYS = ['crimescene_kakao_v1'];
@@ -3729,7 +3729,7 @@ function guestMode(){
 /* ----- 분류(폴더) 탐색 화면 ----- */
 let treePath = [];          /* [] | [대분류id] | [대분류id, 중분류id] */
 let editingNode = '';       /* 이름 편집 중인 항목 (c1:id / c2:id / L:key) */
-let foldState = { chrome:true, pad:true };   /* 접힘 상태 (기본 접힘) */
+let foldState = { title:true, chrome:true, pad:true };   /* 접힘 상태 (기본 접힘) */
 
 function curC1(){ return treePath[0] ? data.tree.find(c=>c.id===treePath[0]) : null; }
 function curC2(){ const c1 = curC1(); return (c1 && treePath[1]) ? (c1.children||[]).find(c=>c.id===treePath[1]) : null; }
@@ -4222,12 +4222,14 @@ function renderAdminHome(resetScroll){
       <div class="hint">지금 보고 있는 목록: <b>${esc(listLabel(L))}</b> (${esc(listPathText(L))}) · 주소 <b>?list=${esc(L.key)}</b></div>
     </div>
 
-    <div class="admin-section">
-      <h3>목록 상단 제목 <span class="rsub">${esc(listLabel(L))}</span></h3>
-      <div class="field">
-        <input id="ed-listTitle" value="${esc(L.title||'채팅')}">
+    <div class="admin-section ${foldState.title?'folded':''}">
+      <h3 class="foldable" data-fold="title">목록 상단 제목 <span class="fold-arrow">${foldState.title?'▶':'▼'}</span></h3>
+      <div class="fold-body">
+        <div class="field">
+          <input id="ed-listTitle" value="${esc(L.title||'채팅')}">
+        </div>
+        <button class="btn btn-ghost btn-sm" id="saveListTitle">제목 저장</button>
       </div>
-      <button class="btn btn-ghost btn-sm" id="saveListTitle">제목 저장</button>
     </div>
 
     <div class="admin-section ${foldState.chrome?'folded':''}">
