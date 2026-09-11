@@ -2799,7 +2799,7 @@ const EMBEDDED_DATA = {
 
 /* 코드(기능) 버전. 데이터와 별개로 “이 파일의 프로그램이 언제 것인지”를 나타낸다.
    관리자 정보란에 표시되므로, 폰에 옛 파일이 올라갔는지 바로 알 수 있다. */
-const CODE_VERSION = '2026-09-11-K';
+const CODE_VERSION = '2026-09-11-L';
 
 const STORE_KEY = 'crimescene_kakao_v2';
 const LEGACY_KEYS = ['crimescene_kakao_v1'];
@@ -3720,7 +3720,7 @@ function closeAdmin(){
 function guestMode(){
   isAdmin = false;
   $('#modePill').classList.remove('show');
-  $('#btnAdmin').style.display = 'none';
+  /* 톱니바퀴는 손님 화면에도 그대로 보이지만 눌러도 아무 일도 하지 않는다 */
   toast('손님 모드로 전환되었습니다');
   if($('#adminOverlay').classList.contains('active')) goBack();
   else backToList();
@@ -3762,14 +3762,13 @@ function nameEditorHtml(nodeId, name, keyValue, c1name, c2name){
       <input id="nodeName" value="${esc(name)}">
     </div>
     <div class="field">
-      <label>주소용 이름 (?list= 뒤에 붙는 이름)</label>
+      <label>주소용 이름 (?list= 뒤에 붙는 이름) — 위 이름을 적으면 자동으로 채워집니다</label>
       <input id="nodeKey" value="${esc(keyValue)}">
-      <div class="hint" style="margin-top:4px">주소를 바꾸면 <b>m 폴더의 매니페스트 파일</b>도 새 이름으로 다시 만들어야 하고,
-        이미 설치된 앱은 지우고 다시 설치해야 합니다.</div>
+      <div class="hint" style="margin-top:4px">직접 고쳐도 됩니다. 주소를 바꾸면 이미 설치된 앱은 지우고 다시 설치해야 합니다.</div>
     </div>
     <div class="row-actions">
       <button class="btn btn-primary btn-sm" id="nodeSave">저장</button>
-      <button class="btn btn-ghost btn-sm" id="nodeAuto">경로에서 자동 생성</button>
+      <button class="btn btn-ghost btn-sm" id="nodeAuto">주소 다시 만들기</button>
       <button class="btn btn-ghost btn-sm" id="nodeCancel">취소</button>
     </div>`;
 }
@@ -3945,15 +3944,25 @@ function bindTreeSection(body){
   const nSave = $('#nodeSave');
   if(nSave){
     $('#nodeCancel').onclick = ()=>{ editingNode = ''; renderAdminHome(); };
-    const auto = $('#nodeAuto');
-    if(auto) auto.onclick = ()=>{
+    const nName = $('#nodeName'), nKey = $('#nodeKey');
+    const makeKeyNow = ()=>{
       const c1 = curC1(), c2 = curC2();
-      const label = $('#nodeName').value.trim() || '목록';
-      $('#nodeKey').value = makeListKey(c1?c1.name:'', c2?c2.name:'', label, listByKey(editingNode.slice(2)));
+      const label = nName.value.trim() || '목록';
+      return makeListKey(c1?c1.name:'', c2?c2.name:'', label, listByKey(editingNode.slice(2)));
     };
+    /* 관리자 화면용 이름을 적으면 주소용 이름이 자동으로 따라 채워진다.
+       주소 칸을 직접 고치면 그때부터 자동 채움을 멈춘다. */
+    if(nKey){
+      let keyTouched = false;
+      nKey.oninput = ()=>{ keyTouched = true; };
+      nName.oninput = ()=>{ if(!keyTouched) nKey.value = makeKeyNow(); };
+    }
+    const auto = $('#nodeAuto');
+    if(auto) auto.onclick = ()=>{ if(nKey){ nKey.value = makeKeyNow(); nKey.oninput = ()=>{}; } };
     nSave.onclick = ()=>{
       const nameVal = $('#nodeName').value.trim();
       if(!nameVal){ toast('이름을 입력하세요'); return; }
+      if(nKey && !nKey.value.trim()) nKey.value = makeKeyNow();   /* 비어 있으면 자동 생성 */
       if(editingNode.indexOf('c1:') === 0){
         const node = data.tree.find(c=>c.id === editingNode.slice(3));
         if(node) node.name = nameVal;
@@ -4824,7 +4833,8 @@ function importData(e){
 
 /* ---------- 이벤트 연결 ---------- */
 $('#btnBack').onclick = goBack;
-$('#btnAdmin').onclick = openAdmin;
+/* 관리자 상태에서만 동작. 손님 모드에서는 장식용(검색 아이콘과 같음) */
+$('#btnAdmin').onclick = ()=>{ if(isAdmin) openAdmin(); };
 $('#adminClose').onclick = goBack;
 $('#adminGuest').onclick = guestMode;
 $('#photoClose').onclick = goBack;
@@ -4878,7 +4888,7 @@ $('#messages').addEventListener('scroll', onMessagesScroll, {passive:true});
 /* 제목 길게 눌러 관리자 진입 */
 let pressTimer = null;
 const listTitleEl = $('#listTitle');
-function startPress(){ pressTimer = setTimeout(()=>{ $('#btnAdmin').style.display='flex'; openAdmin(); }, 5000); }
+function startPress(){ pressTimer = setTimeout(()=>{ openAdmin(); }, 5000); }
 function cancelPress(){ clearTimeout(pressTimer); }
 listTitleEl.addEventListener('mousedown', startPress);
 listTitleEl.addEventListener('touchstart', startPress, {passive:true});
