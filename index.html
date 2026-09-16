@@ -191,6 +191,43 @@
   .admin-header button { background:rgba(255,255,255,.15); color:#fff; border:none;
     padding:8px 14px; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600; }
   .admin-body { flex:1; overflow-y:auto; padding:16px; }
+
+  /* 모바일: 한 번에 한 칸만 보여준다 (지금까지와 같은 방식) */
+  #adminBody:not(.room-open) #paneRoom,
+  #adminBody:not(.room-open) #paneMsgs { display:none; }
+  #adminBody.room-open #paneHome { display:none; }
+  .pane-empty { color:#98a5b2; font-size:13px; text-align:center; padding:40px 16px; }
+
+  /* PC(마우스 쓰는 넓은 화면): 사이드바 · 대화방 편집 · 대화 내용 3단 */
+  @media (min-width:1000px) and (pointer:fine){
+    #phone { max-width:none; max-height:none; width:100vw; height:100vh; box-shadow:none; }
+    body { background:#e9edf0; }
+    #listScreen, #roomScreen { max-width:430px; margin:0 auto; width:100%; }  /* 손님 화면은 폰 모양 유지 */
+    .admin-body { display:flex; gap:14px; align-items:stretch; overflow:hidden; padding:14px; }
+    .apane { overflow-y:auto; min-width:0; padding-right:2px; }
+    #paneHome { flex:0 0 330px; }
+    #paneRoom { flex:0 0 360px; }
+    #paneMsgs { flex:1 1 auto; }
+    #adminBody:not(.room-open) #paneRoom,
+    #adminBody:not(.room-open) #paneMsgs,
+    #adminBody.room-open #paneHome { display:block; }
+    #backToRooms { display:none; }          /* 3단에서는 목록이 항상 보이므로 불필요 */
+
+    /* 대화 내용을 카톡처럼 좌우로 나눠 보여준다 */
+    .msg-editor { max-width:86%; }
+    .msg-editor.mine { margin-left:auto; }
+  }
+
+  /* 누가 보낸 메시지인지 색으로도 구분 */
+  .msg-editor.mine { background:#fffdf0; border-color:#efe3a8; }
+  .msg-editor .who { font-size:11.5px; font-weight:700; color:#8a97a5; margin-bottom:6px; }
+  .msg-editor.mine .who { color:#a08b2a; text-align:right; }
+
+  /* 맨 아래 메시지 추가 줄 */
+  .add-row { display:flex; gap:8px; align-items:center; margin-top:12px; }
+  .add-row .left { display:flex; gap:6px; align-items:center; flex:1; min-width:0; }
+  .add-row .left select { flex:0 1 160px; min-width:0; }
+  .add-row .right { margin-left:auto; }
   .admin-section { background:#fff; border-radius:12px; padding:16px; margin-bottom:14px; }
   .admin-section h3 { font-size:14px; color:#3a4a5a; margin-bottom:12px; font-weight:700;
     display:flex; align-items:center; justify-content:space-between; }
@@ -431,7 +468,11 @@
         <button id="adminClose">닫기</button>
       </div>
     </div>
-    <div class="admin-body" id="adminBody"></div>
+    <div class="admin-body" id="adminBody">
+      <div class="apane" id="paneHome"></div>
+      <div class="apane" id="paneRoom"></div>
+      <div class="apane" id="paneMsgs"></div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -3063,7 +3104,7 @@ const EMBEDDED_DATA = {
 
 /* 코드(기능) 버전. 데이터와 별개로 “이 파일의 프로그램이 언제 것인지”를 나타낸다.
    관리자 정보란에 표시되므로, 폰에 옛 파일이 올라갔는지 바로 알 수 있다. */
-const CODE_VERSION = '2026-09-11-O';
+const CODE_VERSION = '2026-09-16-P';
 
 const STORE_KEY = 'crimescene_kakao_v2';
 const LEGACY_KEYS = ['crimescene_kakao_v1'];
@@ -4467,7 +4508,7 @@ function renderAdminHome(resetScroll){
   syncUrl();
   $('#adminTitle').textContent = '관리자';
   const L = curList();
-  const body = $('#adminBody');
+  const body = $('#paneHome');
   let html = `
     ${hasLocalEdits() ? `<div class="admin-section" style="background:#fff8d6;border:1px solid #f0dd8a">
       <h3 style="color:#7a5b00">이 기기에만 저장된 수정이 있습니다</h3>
@@ -4625,9 +4666,13 @@ function renderAdminHome(resetScroll){
       <button class="btn btn-yellow btn-block" id="exportHtmlBtn">새 index.html 만들기</button>
       <div class="hint">지금 내용을 그대로 담은 배포용 index.html 을 만듭니다. 이 파일로 폴더의 index.html 을 바꾸면, 다른 폰에 설치할 때 이 내용이 들어갑니다.</div>
     </div>`;
-  const prevScroll = resetScroll ? 0 : body.scrollTop;
+  const scroller = wideAdmin() ? body : $('#adminBody');
+  const prevScroll = resetScroll ? 0 : scroller.scrollTop;
   body.innerHTML = html;
-  body.scrollTop = prevScroll;
+  scroller.scrollTop = prevScroll;
+  /* 3단 화면에서는 선택해 둔 대화방 편집 칸도 함께 갱신한다 */
+  if(adminRoomId && findRoom(adminRoomId)) renderRoomPanes(adminRoomId);
+  else clearRoomPanes();
 
   if(location.protocol === 'file:') $('#mfMode').textContent = '파일 직접 열기 — 설치 불가';
   else refreshAdminInfo();
@@ -4742,12 +4787,32 @@ function moveRoom(rid, dir){
 }
 
 /* ----- 개별 대화방 편집 ----- */
+/* PC(넓은 화면 + 마우스)에서는 사이드바·대화방·대화내용 3단으로 나눠 보여준다 */
+let adminRoomId = '';
+function wideAdmin(){
+  try{ return window.matchMedia('(min-width:1000px) and (pointer:fine)').matches; }
+  catch(e){ return false; }
+}
+function clearRoomPanes(){
+  adminRoomId = '';
+  const r = $('#paneRoom'), m = $('#paneMsgs');
+  if(r) r.innerHTML = '<div class="pane-empty">왼쪽에서 대화방의 <b>편집</b>을 누르세요.</div>';
+  if(m) m.innerHTML = '';
+  const ab = $('#adminBody'); if(ab) ab.classList.remove('room-open');
+}
 function editRoom(rid){
   const room = findRoom(rid);
   if(!room) return renderAdminHome();
+  adminRoomId = rid;
+  const ab = $('#adminBody'); if(ab) ab.classList.add('room-open');
+  renderRoomPanes(rid);
+}
+function renderRoomPanes(rid){
+  const room = findRoom(rid);
+  if(!room) return clearRoomPanes();
   syncRoomName(room);
-  $('#adminTitle').textContent = '대화방 편집';
-  const body = $('#adminBody');
+  $('#adminTitle').textContent = wideAdmin() ? '관리자' : '대화방 편집';
+  const body = $('#paneRoom');
   const nameField = room.isGroup
     ? `<div class="field">
         <label>단톡방 이름 (목록에 표시)</label>
@@ -4813,15 +4878,36 @@ function editRoom(rid){
       <button class="btn btn-ghost btn-sm" id="invReset">자동 문구로 되돌리기</button>
       <div class="hint">자동 문구: <b>${esc(inviteAuto(room)||'-')}</b><br>
         채팅방에서는 <b>날짜 → 초대 문구 → 첫 메시지</b> 순서로 표시됩니다.</div>
-    </div>` : ''}
+    </div>` : ''}`;
 
+  const others = room.participants.filter(p=>!p.isMe);
+  const meName = (room.participants.find(p=>p.isMe)||{}).name || '나';
+  const lastOther = (function(){
+    for(let i=room.messages.length-1; i>=0; i--){
+      const p = partOf(room, room.messages[i].senderName);
+      if(p && !p.isMe) return p.name;
+    }
+    return others[0] ? others[0].name : '';
+  })();
+  $('#paneMsgs').innerHTML = `
     <div class="admin-section">
       <h3>대화 내용</h3>
+      <div class="hint" style="margin-top:0">시간은 <b>1450</b> → 오후 2:50, <b>930</b> → 오전 9:30 처럼 숫자만 넣으면 됩니다.<br>
+        날짜는 <b>20260504</b> → 2026-05-04 로 바뀌며, <b>바뀌는 날의 첫 메시지</b>에만 넣으면 됩니다.</div>
       <div id="msgList"></div>
-      <button class="btn btn-yellow btn-block" id="addMsg" style="margin-top:10px">＋ 메시지 추가</button>
+      <div class="add-row">
+        <div class="left">
+          ${room.isGroup && others.length > 1
+            ? `<select id="addWho">${others.map(p=>`<option ${p.name===lastOther?'selected':''}>${esc(p.name)}</option>`).join('')}</select>`
+            : ''}
+          <button class="btn btn-ghost" id="addMsgOther">＋ ${room.isGroup && others.length>1 ? '상대 메시지' : esc(lastOther || '상대방')}</button>
+        </div>
+        <button class="btn btn-yellow right" id="addMsgMine">＋ ${esc(meName)}</button>
+      </div>
     </div>`;
 
-  $('#backToRooms').onclick = ()=>{ save(); renderAdminHome(true); };
+  const back = $('#backToRooms');
+  if(back) back.onclick = ()=>{ save(); clearRoomPanes(); renderAdminHome(true); };
   const rn = $('#rn'); if(rn) rn.oninput = e=>{ room.name = e.target.value; save(); };
   $('#rg').onchange = e=>{ room.isGroup = e.target.checked; syncRoomName(room); save(); editRoom(rid); };
   $('#rpin').onchange = e=>{ room.pinned = e.target.checked; save(); };
@@ -4848,17 +4934,20 @@ function editRoom(rid){
     room.participants.push({id:id(), name:v, silo:room.participants.length%2, isMe:false, avatar:''});
     syncRoomName(room); save(); editRoom(rid);
   };
-  $('#addMsg').onclick = ()=>{
+  /* 맨 아래 ＋ 버튼 — 왼쪽은 상대방, 오른쪽은 “나”가 보낸 메시지로 자동 지정 */
+  const addMsgBy = who=>{
     const lastMsg = room.messages[room.messages.length-1];
-    const lastName = lastMsg ? lastMsg.senderName : ((room.participants.find(p=>!p.isMe)||{}).name || '');
-    room.messages.push({id:id(), senderName:lastName, text:'', image:'', time:(lastMsg?lastMsg.time:''), date:'', unread:0});
-    save(); editRoom(rid);
-    /* 방금 추가한 메시지와 추가 버튼이 보이도록 맨 아래로 */
-    const body = $('#adminBody');
+    room.messages.push({id:id(), senderName:who, text:'', image:'',
+      time:(lastMsg?lastMsg.time:''), date:'', unread:0});
+    save(); renderRoomPanes(rid);
     const last = $('#msgList') ? $('#msgList').lastElementChild : null;
     if(last) last.scrollIntoView({block:'center'});
-    else if(body) body.scrollTop = body.scrollHeight;
   };
+  $('#addMsgOther').onclick = ()=>{
+    const sel = $('#addWho');
+    addMsgBy(sel ? sel.value : (lastOther || (others[0]||{}).name || ''));
+  };
+  $('#addMsgMine').onclick = ()=> addMsgBy(meName);
   renderParticipants(room, rid);
   renderMsgEditors(room, rid);
 }
@@ -4954,19 +5043,17 @@ function resizeImage(file, size, cb){
 function renderMsgEditors(room, rid){
   const box = $('#msgList'); box.innerHTML = '';
   if(!room.messages.length){
-    box.innerHTML = `<div class="hint">메시지가 없습니다. “＋ 메시지”로 추가하세요.</div>`;
+    box.innerHTML = `<div class="hint">메시지가 없습니다. 아래 <b>＋</b> 버튼으로 추가하세요.</div>`;
   }
   const opts = room.participants.map(p=>p.name);
-  const hint = document.createElement('div');
-  hint.className = 'hint';
-  hint.style.margin = '0 0 10px';
-  hint.innerHTML = '시간은 <b>1450</b> → 오후 2:50, <b>930</b> → 오전 9:30 처럼 숫자만 넣으면 됩니다.<br>날짜는 <b>20260504</b> → 2026-05-04 로 바뀌며, <b>바뀌는 날의 첫 메시지</b>에만 넣으면 됩니다.';
-  box.appendChild(hint);
   room.messages.forEach((msg, i)=>{
     const ed = document.createElement('div');
-    ed.className = 'msg-editor';
+    const sp = partOf(room, msg.senderName);
+    const mine = !!(sp && sp.isMe);
+    ed.className = 'msg-editor' + (mine ? ' mine' : '');
     const unread = Number(msg.unread)||0;
     ed.innerHTML = `
+      <div class="who">${esc(msg.senderName || '(이름 없음)')}${mine ? ' · 나' : ''}</div>
       <div class="er1">
         <select data-f="sender">
           ${opts.map(n=>`<option ${n===msg.senderName?'selected':''}>${esc(n)}</option>`).join('')}
@@ -4996,7 +5083,8 @@ function renderMsgEditors(room, rid){
         <button class="btn btn-danger btn-sm" data-del="${i}">삭제</button>
       </div>`;
 
-    ed.querySelector('[data-f="sender"]').onchange = e=>{ msg.senderName = e.target.value; save(); };
+    /* 보낸 사람이 바뀌면 좌·우 위치도 바로 따라가도록 다시 그린다 */
+    ed.querySelector('[data-f="sender"]').onchange = e=>{ msg.senderName = e.target.value; save(); renderMsgEditors(room, rid); };
 
     const timeInput = ed.querySelector('[data-f="time"]');
     const applyTime = ()=>{
