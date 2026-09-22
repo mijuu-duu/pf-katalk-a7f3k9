@@ -433,7 +433,7 @@
       <div class="tab active" title="채팅">
         <div class="tab-ico">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.7 1.7 5.1 4.3 6.5-.2.9-.7 2.4-1 3.1-.1.4.3.7.6.5 1.4-.6 3.2-1.5 4.1-2.1.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8s-4.5-8-10-8z"></path></svg>
-          <span class="tab-badge hidden" id="chatTabBadge">1</span>
+          <span class="tab-badge hidden" id="chatTabBadge">3</span>
         </div>
       </div>
       <div class="tab" title="오픈채팅">
@@ -455,10 +455,10 @@
   <div class="screen" id="roomScreen">
     <div class="header">
       <button class="back" id="btnBack">‹</button>
-      <div class="title" id="roomTitle">그룹채팅 5</div>
+      <div class="title" id="roomTitle">현회장</div>
     </div>
     <div class="messages" id="messages"></div>
-    <div class="float-date" id="floatDate"><span>2018년 1월 20일 토요일</span></div>
+    <div class="float-date" id="floatDate"><span>2018년 4월 28일 토요일</span></div>
     <div class="inputbar">
       <span class="plus">＋</span>
       <div class="fake-input">메시지 입력</div>
@@ -481,7 +481,7 @@
         <button id="adminClose">닫기</button>
       </div>
     </div>
-    <div class="admin-body" id="adminBody"><div class="apane" id="paneHome"></div><div class="apane" id="paneRoom"></div><div class="apane" id="paneMsgs"></div></div>
+    <div class="admin-body room-open" id="adminBody"><div class="apane" id="paneHome"></div><div class="apane" id="paneRoom"></div><div class="apane" id="paneMsgs"></div></div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -509,7 +509,7 @@
    ============================================================ */
 
 /*__CS_DATA_START__ 아래 두 줄이 이 파일에 들어있는 대화 내용입니다. */
-const DATA_VERSION = "2026-09-21-175348";
+const DATA_VERSION = "2026-09-22-143206";
 const EMBEDDED_DATA = {
  "appName": "카카오톡",
  "tree": [
@@ -749,7 +749,7 @@ const EMBEDDED_DATA = {
        "senderName": "김퀸카",
        "text": "소심아 혹시 우리 같이 학생회 가입하지 않을래?",
        "image": "",
-       "time": "",
+       "time": "오후 1:12",
        "date": "2018-03-15",
        "unread": 0
       },
@@ -758,7 +758,7 @@ const EMBEDDED_DATA = {
        "senderName": "김퀸카",
        "text": "학생회 가입하면 활동도 많이 하니까",
        "image": "",
-       "time": "",
+       "time": "오후 1:12",
        "date": "",
        "unread": 0
       },
@@ -785,7 +785,7 @@ const EMBEDDED_DATA = {
        "senderName": "김퀸카",
        "text": "그래!",
        "image": "",
-       "time": "",
+       "time": "오후 1:18",
        "date": "",
        "unread": 0
       },
@@ -888,7 +888,12 @@ const EMBEDDED_DATA = {
       "p16gxs10": {
        "unread": 0
       }
-     }
+     },
+     "only": [
+      "p18g228o",
+      "p16gxs10",
+      "p8od5in"
+     ]
     },
     {
      "id": "xvqpk3s4",
@@ -910,7 +915,7 @@ const EMBEDDED_DATA = {
        "senderName": "정신과 의사선생님",
        "text": "소심양",
        "image": "",
-       "time": "",
+       "time": "오후 2:20",
        "date": "2019-04-03",
        "unread": 0
       },
@@ -919,7 +924,7 @@ const EMBEDDED_DATA = {
        "senderName": "정신과 의사선생님",
        "text": "몸 상태는 괜찮나요?",
        "image": "",
-       "time": "",
+       "time": "오후 2:20",
        "date": "",
        "unread": 0
       },
@@ -972,7 +977,7 @@ const EMBEDDED_DATA = {
        "senderName": "현회장",
        "text": "그때 일 아무한테도 말 안했겠지?",
        "image": "",
-       "time": "",
+       "time": "오후 8:05",
        "date": "2018-04-28",
        "unread": 0
       },
@@ -999,7 +1004,7 @@ const EMBEDDED_DATA = {
        "senderName": "왕소심",
        "text": "그때 신고했으면 아무 죄도 없는건데 왜 시체를 숨겼어요...",
        "image": "",
-       "time": "",
+       "time": "오후 8:06",
        "date": "",
        "unread": 0
       },
@@ -1017,7 +1022,7 @@ const EMBEDDED_DATA = {
        "senderName": "강임원",
        "text": "그러니까 더 숨기라고",
        "image": "",
-       "time": "",
+       "time": "오후 8:08",
        "date": "",
        "unread": 0
       },
@@ -1026,7 +1031,7 @@ const EMBEDDED_DATA = {
        "senderName": "강임원",
        "text": "살인자 되고싶어?",
        "image": "",
-       "time": "",
+       "time": "오후 8:08",
        "date": "",
        "unread": 0
       },
@@ -1053,7 +1058,7 @@ const EMBEDDED_DATA = {
        "senderName": "현회장",
        "text": "이 카톡방은 지금 아무 말도 하지 말고 나가",
        "image": "",
-       "time": "",
+       "time": "오후 8:11",
        "date": "",
        "unread": 0
       },
@@ -1380,7 +1385,7 @@ const EMBEDDED_DATA = {
        "senderName": "현회장",
        "text": "우리 엠티 장소에 대해서 투표를 해야 하거든?",
        "image": "",
-       "time": "",
+       "time": "오후 6:50",
        "date": "2019-03-16",
        "unread": 0
       },
@@ -1434,7 +1439,7 @@ const EMBEDDED_DATA = {
        "senderName": "현회장",
        "text": "이미 흉가체험이 과반수라 흉가 체험으로 결정할게",
        "image": "",
-       "time": "오후 6:55",
+       "time": "오후 8:00",
        "date": "",
        "unread": 0
       }
@@ -1590,7 +1595,7 @@ const EMBEDDED_DATA = {
     {
      "id": "pb86jzo",
      "name": "김퀸카",
-     "avatar": "",
+     "avatar": "data:image/jpeg;base64,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",
      "silo": 0
     },
     {
@@ -1651,11 +1656,7 @@ const EMBEDDED_DATA = {
     "강남1호점_폐가_기신봄": "p16fkjrw",
     "강남1호점_폐가_현회장": "p18g228o"
    },
-   "alias": {
-    "p13zfgp4": {
-     "p18g228o": "현현"
-    }
-   }
+   "alias": {}
   },
   {
    "key": "강남2호점_성균관",
@@ -5611,6 +5612,7 @@ setTimeout(function once(){
   checkForUpdate(false);
 }, 1500);
 </script>
+
 
 
 
