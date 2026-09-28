@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -197,6 +197,25 @@
   #adminBody:not(.room-open) #paneMsgs { display:none; }
   #adminBody.room-open #paneHome { display:none; }
   .pane-empty { color:#98a5b2; font-size:13px; text-align:center; padding:40px 16px; }
+
+  /* 이 폰을 쓸 지점 고르기 — 고르기 전에는 내용이 전혀 보이지 않는다 */
+  #pickBranch { position:absolute; inset:0; z-index:70; background:#ffe812; display:none;
+                align-items:center; justify-content:center; padding:22px; }
+  #pickBranch.show { display:flex; }
+  .bp-card { width:100%; max-width:360px; max-height:100%; overflow:auto; background:#fff;
+             border-radius:16px; padding:20px 16px; box-shadow:0 10px 30px rgba(0,0,0,.14); }
+  .bp-logo { width:56px; height:56px; margin:0 auto 12px; border-radius:18px; background:#ffe812;
+             display:flex; align-items:center; justify-content:center; }
+  .bp-logo svg { width:34px; height:34px; }
+  .bp-title { font-size:17px; font-weight:800; text-align:center; color:#2a3a4a; }
+  .bp-sub { font-size:12px; color:#8a97a5; text-align:center; margin:6px 0 16px; line-height:1.55; }
+  .bp-row { display:flex; align-items:center; gap:10px; padding:13px 12px; border-radius:12px;
+            cursor:pointer; border:1px solid #e3e7ec; margin-bottom:8px; }
+  .bp-row:hover { background:#fffbe3; border-color:#f0c800; }
+  .bp-name { font-size:15.5px; font-weight:700; flex:1; min-width:0; color:#2a3a4a; }
+  .bp-cnt { font-size:12px; color:#8a97a5; font-weight:500; }
+  .bp-go { font-size:12px; color:#3b6fd4; font-weight:700; white-space:nowrap; }
+  .bp-foot { font-size:11px; color:#a8b4c0; text-align:center; margin-top:12px; line-height:1.5; }
 
 
   /* PC(마우스 쓰는 넓은 화면): 사이드바 · 대화방 편집 · 대화 내용 3단 */
@@ -463,6 +482,19 @@
       <span class="plus">＋</span>
       <div class="fake-input">메시지 입력</div>
       <span class="send">➤</span>
+    </div>
+  </div>
+
+  <!-- 이 폰을 쓸 지점 고르기 -->
+  <div id="pickBranch">
+    <div class="bp-card">
+      <div class="bp-logo">
+        <svg viewBox="0 0 24 24" fill="#3a2a00"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.7 1.7 5.1 4.3 6.5-.2.9-.7 2.4-1 3.1-.1.4.3.7.6.5 1.4-.6 3.2-1.5 4.1-2.1.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8s-4.5-8-10-8z"/></svg>
+      </div>
+      <div class="bp-title">이 폰을 쓸 지점을 고르세요</div>
+      <div class="bp-sub">고른 지점의 내용만 보입니다.<br>이 기기에만 저장되며, 나중에 바꿀 수 없습니다.</div>
+      <div id="branchList"></div>
+      <div class="bp-foot">잘못 골랐다면 주소 끝에 <b>?reset=1</b> 을 붙여 다시 여세요.</div>
     </div>
   </div>
 
@@ -2604,7 +2636,7 @@ const EMBEDDED_DATA = {
 
 /* 코드(기능) 버전. 데이터와 별개로 “이 파일의 프로그램이 언제 것인지”를 나타낸다.
    관리자 정보란에 표시되므로, 폰에 옛 파일이 올라갔는지 바로 알 수 있다. */
-const CODE_VERSION = '2026-09-21-Z';
+const CODE_VERSION = '2026-09-28-AA';
 
 const STORE_KEY = 'crimescene_kakao_v2';
 const LEGACY_KEYS = ['crimescene_kakao_v1'];
@@ -2954,6 +2986,60 @@ function curList(){ return data.lists[listIdx] || data.lists[0]; }
    대화 내용은 중분류에 한 번만 쓰고, 폰마다 “나”만 고르면 그 사람의 카카오톡이 된다.
    손님 화면에는 “나”가 참여한 대화방만 보인다.
    ============================================================ */
+/* ---------- 이 폰의 지점 잠금 ----------
+   폰 한 대는 한 지점만 본다. 처음 실행할 때 고르고, 그 뒤에는 바꿀 수 없다.
+   다른 지점 내용은 화면에 아예 나오지 않아 스포일러를 막는다.
+   (바꿔야 하면 주소 끝에 ?reset=1 을 붙여 이 기기 설정을 초기화한다) */
+const BRANCH_KEY = 'crimescene_kakao_branch';
+let branchLock = null;              /* {id, name} — 기기마다 따로 저장된다 */
+function loadBranch(){
+  try{ const v = JSON.parse(localStorage.getItem(BRANCH_KEY)); branchLock = (v && typeof v === 'object') ? v : null; }
+  catch(e){ branchLock = null; }
+}
+function saveBranch(){
+  try{
+    if(branchLock) localStorage.setItem(BRANCH_KEY, JSON.stringify(branchLock));
+    else localStorage.removeItem(BRANCH_KEY);
+  }catch(e){}
+}
+/* 잠긴 지점. 이름이 바뀌어도 id 로 따라가고, id 가 바뀌면 이름으로 찾아 고쳐 둔다 */
+function lockedC1(){
+  if(!branchLock || !data) return null;
+  const byId = (data.tree||[]).find(c=>c.id === branchLock.id);
+  if(byId){
+    if(branchLock.name !== byId.name){ branchLock.name = byId.name; saveBranch(); }
+    return byId;
+  }
+  const byName = (data.tree||[]).find(c=>c.name === branchLock.name);
+  if(byName){ branchLock = {id:byName.id, name:byName.name}; saveBranch(); return byName; }
+  return null;
+}
+/* PC(편집용)에서는 잠그지 않는다 — 제작자는 전체를 봐야 한다 */
+function branchLocked(){ return !wideAdmin() && !!lockedC1(); }
+function setBranch(c1){ branchLock = {id:c1.id, name:c1.name}; saveBranch(); }
+/* 잠긴 지점 밖의 목록인지 */
+function listAllowed(L){
+  const lk = branchLocked() ? lockedC1() : null;
+  if(!lk || !L) return true;
+  const c = catOfList(L.key);
+  return !!(c && c.c1.id === lk.id);
+}
+/* 잠긴 지점 밖을 보고 있으면 그 지점의 첫 목록으로 옮긴다 */
+function fixListForBranch(){
+  const lk = branchLocked() ? lockedC1() : null;
+  if(!lk || listAllowed(curList())) return;
+  const keys = [];
+  (lk.children||[]).forEach(c2=> (c2.lists||[]).forEach(k=> keys.push(k)));
+  for(const k of keys){ const i = findListIdx(k); if(i >= 0){ listIdx = i; return; } }
+}
+/* 관리자 화면이 잠긴 지점 밖으로 나가지 않게 한다 */
+function enforceBranchLock(){
+  const lk = branchLocked() ? lockedC1() : null;
+  if(!lk) return;
+  if(treePath[0] !== lk.id){ treePath = [lk.id]; adminListPicked = false; adminRoomId = ''; }
+}
+function treeMinDepth(){ return branchLocked() ? 1 : 0; }
+
 const VIEW_KEY = 'crimescene_kakao_me';
 let viewAs = {};                    /* {목록키: 인물id} — 기기마다 따로 저장된다 */
 function loadView(){
@@ -3827,6 +3913,32 @@ function renderList(){
   });
   updateChatTabBadge(totalUnread);
 }
+/* 이 폰을 쓸 지점 고르기 — 지점 이름만 보여준다 (대화 내용은 나오지 않는다) */
+function renderBranchPicker(){
+  const box = $('#pickBranch');
+  if(!box) return;
+  const list = $('#branchList');
+  list.innerHTML = '';
+  (data.tree||[]).forEach(c1=>{
+    const cnt = countInCat1(c1);
+    const row = document.createElement('div');
+    row.className = 'bp-row';
+    row.innerHTML = `
+      <div class="bp-name">${esc(c1.name)}<div class="bp-cnt">테마 ${cnt.subs}개</div></div>
+      <span class="bp-go">이 지점으로</span>`;
+    row.onclick = ()=>{
+      setBranch(c1);
+      box.classList.remove('show');
+      fixListForBranch();
+      isAdmin = true;
+      renderList();
+      openAdmin(true);
+      toast('“' + c1.name + '” 지점으로 설정했습니다');
+    };
+    list.appendChild(row);
+  });
+  box.classList.add('show');
+}
 function updateChatTabBadge(total){
   const tb = $('#chatTabBadge');
   if(tb){
@@ -4071,8 +4183,10 @@ function openAdmin(fromTop){
   $('#modePill').classList.add('show');
   $('#adminOverlay').classList.add('active');
   if(fromTop){
-    /* 처음 설치한 기기 — 대분류부터 고르게 한다 */
-    treePath = []; adminListPicked = false; adminRoomId = '';
+    /* 처음 설치한 기기 — 대분류(지점 잠금이면 그 지점)부터 고르게 한다 */
+    const lk = branchLocked() ? lockedC1() : null;
+    treePath = lk ? [lk.id] : [];
+    adminListPicked = false; adminRoomId = '';
   } else {
     /* 지금 보고 있는 목록이 속한 폴더를 펼친 채로, 그 목록을 고른 상태로 연다 */
     try{
@@ -4322,6 +4436,7 @@ function bindTreeSection(body){
   });
   const up = $('#treeUp');
   if(up) up.onclick = ()=>{
+    if(treePath.length <= treeMinDepth()) return;   /* 잠긴 지점 위로는 못 올라간다 */
     treePath.pop(); editingNode = '';
     adminListPicked = false; adminRoomId = '';   /* 상위 폴더로 가면 목록 선택을 푼다 */
     renderAdminHome();
@@ -4609,6 +4724,8 @@ function importRoomPanel(){
 /* ----- 관리자 첫 화면 ----- */
 /* 기본은 보고 있던 위치 유지. resetScroll = true 일 때만 맨 위로 올린다 */
 function renderAdminHome(resetScroll){
+  enforceBranchLock();     /* 잠긴 지점 밖으로 나가지 않게 */
+  fixListForBranch();
   syncAllRoomNames();
   applyMeFlags();
   try{ refreshQuota().then(()=>{ const q = document.getElementById('quotaText'); if(q) q.textContent = quotaText; }); }catch(e){}
@@ -4662,9 +4779,11 @@ function renderAdminHome(resetScroll){
     <div class="admin-section">
       <h3>${curC2() ? '등장인물' : '대화 목록'}</h3>
       <div class="crumb">
-        ${treePath.length ? '<button class="btn btn-ghost btn-sm" id="treeUp">↑ 상위 폴더</button>' : ''}
+        ${treePath.length > treeMinDepth() ? '<button class="btn btn-ghost btn-sm" id="treeUp">↑ 상위 폴더</button>' : ''}
         ${breadcrumbHtml()}
       </div>
+      ${branchLocked() ? `<div class="hint" style="margin-top:0">이 폰은 <b>${esc(lockedC1().name)}</b> 지점 전용입니다.
+        다른 지점은 볼 수 없습니다.</div>` : ''}
       <div class="drag-hint">끌어서 순서를 변경할 수 있습니다. (폰에서는 살짝 길게 누른 뒤 끌어주세요)</div>
       <div id="treeBox">${treeItemsHtml()}</div>
       <button class="btn btn-yellow btn-block" id="treeAdd" style="margin-top:4px">＋ ${curC2() ? '새 인물' : (curC1() ? '새 중분류' : '새 대분류')}</button>
@@ -5458,13 +5577,13 @@ function newVersion(){
    화면에 그려둔 내용은 열 때마다 다시 그리므로 비워서 내보낸다. */
 function selfHtml(){
   const root = document.documentElement.cloneNode(true);
-  ['#chatList','#messages','#adminBody','#chips','#adbox'].forEach(sel=>{
+  ['#chatList','#messages','#adminBody','#chips','#adbox','#branchList'].forEach(sel=>{
     const el = root.querySelector(sel); if(el) el.innerHTML = '';
   });
   const ap = root.querySelector('#adminBody');
   if(ap) ap.innerHTML = '<div class="apane" id="paneHome"></div><div class="apane" id="paneRoom"></div><div class="apane" id="paneMsgs"></div>';
   const off = (sel, cls)=>{ const el = root.querySelector(sel); if(el) el.classList.remove(cls); };
-  off('#adminOverlay','active'); off('#roomScreen','active');
+  off('#adminOverlay','active'); off('#roomScreen','active'); off('#pickBranch','show');
   off('#photoViewer','show'); off('#modePill','show'); off('#confirmBox','show'); off('#toast','show');
   const ls = root.querySelector('#listScreen'); if(ls) ls.removeAttribute('style');
   const ab = root.querySelector('#btnAdmin'); if(ab) ab.removeAttribute('style');
@@ -5613,23 +5732,30 @@ listTitleEl.addEventListener('touchstart', startPress, {passive:true});
 ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=> listTitleEl.addEventListener(ev, cancelPress));
 
 /* ---------- 시작 ---------- */
-/* 창 크기를 아직 모르는 상태로 시작했을 수 있어, 화면이 다 뜬 뒤 한 번 더 확인한다 */
-let pcTries = 0;
-function startAdminIfPC(){
-  if(isAdmin || !data) return;
+/* 첫 화면 정하기
+   - PC(넓은 화면)  : 편집용이므로 관리자 화면. 지점 잠금 없음.
+   - 폰 · 처음      : 지점 고르기 → 그 지점 안에서 테마·인물 고르기
+   - 폰 · 설정 끝난 뒤 : 손님 화면 */
+let bootTries = 0;
+function decideStartScreen(){
+  if(!data) return;
   /* 창 크기를 아직 못 읽는 상태면 잠깐 기다렸다 다시 본다 */
-  if(!window.innerWidth && pcTries < 20){ pcTries++; setTimeout(startAdminIfPC, 200); return; }
-  if(!wideAdmin()) return;
-  isAdmin = true;
+  if(!window.innerWidth && bootTries < 20){ bootTries++; setTimeout(decideStartScreen, 200); return; }
+  if(wideAdmin()){
+    if(!isAdmin){ isAdmin = true; renderList(); openAdmin(!meId()); }
+    return;
+  }
+  if(!lockedC1() && (data.tree||[]).length){ renderBranchPicker(); return; }
+  fixListForBranch();
+  if(!meId()){ isAdmin = true; renderList(); openAdmin(true); return; }
   renderList();
-  openAdmin(!meId());
 }
 
 (function boot(){
   /* 주소 끝에 ?reset=1 을 붙여 열면 폰에 저장된 내용과 캐시를 전부 지우고 파일 내용으로 시작한다 */
   let first = Promise.resolve();
   if(/[?&]reset=1/.test(location.search)){
-    try{ localStorage.removeItem(STORE_KEY); localStorage.removeItem(LAST_KEY); localStorage.removeItem(VIEW_KEY); localStorage.removeItem(PAD_KEY); LEGACY_KEYS.forEach(k=>localStorage.removeItem(k)); }catch(e){}
+    try{ localStorage.removeItem(STORE_KEY); localStorage.removeItem(LAST_KEY); localStorage.removeItem(VIEW_KEY); localStorage.removeItem(PAD_KEY); localStorage.removeItem(BRANCH_KEY); LEGACY_KEYS.forEach(k=>localStorage.removeItem(k)); }catch(e){}
     try{ first = idbClear(); }catch(e){}
     try{ if(window.caches && caches.keys) caches.keys().then(ks=>ks.forEach(k=>{ if(isMyCache(k)) caches.delete(k); })); }catch(e){}
     try{
@@ -5641,23 +5767,16 @@ function startAdminIfPC(){
   first.catch(()=>{}).then(load).then(d=>{
     data = d;
     loadView();
+    loadBranch();
     selectListFromUrl();
-    /* 처음 설치한 기기(“나”를 아직 안 고른 상태)는 PC·폰 모두 관리자 화면(대분류)으로 시작한다.
-       PC 는 편집용이므로 항상 관리자 화면으로 시작한다.
-       그 밖에는 손님 화면으로 시작하고, 지난번에 고른 “나”를 그대로 이어서 본다. */
-    const fresh = !meId();
-    if(wideAdmin() || fresh) isAdmin = true;
     applyMeFlags();
     save();
     syncUrl();
     renderList();
     askPersist().then(refreshQuota).then(()=>{ try{ refreshAdminInfo(); }catch(e){} });
     if(saveBlocked) setTimeout(()=>toast('저장된 내용을 읽지 못했습니다. 내용 보호를 위해 저장을 멈췄습니다 — 앱을 껐다 켜 주세요.'), 700);
-    if(isAdmin) openAdmin(fresh);
-    else {
-      window.addEventListener('load', startAdminIfPC);
-      setTimeout(startAdminIfPC, 300);
-    }
+    decideStartScreen();
+    window.addEventListener('load', decideStartScreen);
   });
 })();
 
